@@ -96,4 +96,5 @@ public class AuthorizationServerConfiguration extends AuthorizationServerConfigu
                     return token;
                 });
     }
+
 }
