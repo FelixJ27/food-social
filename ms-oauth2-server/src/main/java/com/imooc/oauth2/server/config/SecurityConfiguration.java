@@ -34,6 +34,7 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
     }
 
     //初始化密码编码器，用md5加密密码
+    @Bean
     public PasswordEncoder passwordEncoder() {
         return new PasswordEncoder() {
             /**
