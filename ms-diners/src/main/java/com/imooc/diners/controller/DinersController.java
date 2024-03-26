@@ -60,5 +60,4 @@ public class DinersController {
     public ResultInfo signIn(String account, String password) {
         return dinersService.signIn(account, password, request.getServletPath());
     }
-
 }
