@@ -21,6 +21,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
+import java.time.chrono.IsoChronology;
 import java.util.LinkedHashMap;
 
 /**
@@ -93,35 +94,34 @@ public class DinersService {
      * @return
      */
     public ResultInfo signIn(String account, String password, String path) {
-        // 参数校验
-        AssertUtil.isNotEmpty(account, "请输入登录帐号");
-        AssertUtil.isNotEmpty(password, "请输入登录密码");
-        // 构建请求头
+        //校验参数
+        AssertUtil.isNotEmpty(account, "请输入账号");
+        AssertUtil.isNotEmpty(password, "请输入密码");
+        //构建请求头
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-        // 构建请求体（请求参数）
+        //构建请求体
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("username", account);
         body.add("password", password);
         body.setAll(BeanUtil.beanToMap(oAuth2ClientConfiguration));
         HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
-        // 设置 Authorization
+        //设置authorization
         restTemplate.getInterceptors().add(new BasicAuthenticationInterceptor(oAuth2ClientConfiguration.getClientId(),
                 oAuth2ClientConfiguration.getSecret()));
-        // 发送请求
+        //发送请求
         ResponseEntity<ResultInfo> result = restTemplate.postForEntity(oauthServerName + "oauth/token", entity, ResultInfo.class);
-        // 处理返回结果
-        AssertUtil.isTrue(result.getStatusCode() != HttpStatus.OK, "登录失败");
+        //处理返回结果
+        AssertUtil.isTrue(result.getStatusCode() != HttpStatus.OK,"登录失败");
         ResultInfo resultInfo = result.getBody();
         if (resultInfo.getCode() != ApiConstant.SUCCESS_CODE) {
-            // 登录失败
             resultInfo.setData(resultInfo.getMessage());
             return resultInfo;
         }
-        // 这里的 Data 是一个 LinkedHashMap 转成了域对象 OAuthDinerInfo
-        OAuthDinerInfo dinerInfo = BeanUtil.fillBeanWithMap((LinkedHashMap) resultInfo.getData(),
+        //这里的data是一个LinkedHashMap转成了域对象OAuthDinerInfo
+        OAuthDinerInfo dinerInfo = BeanUtil.fillBeanWithMap((LinkedHashMap)resultInfo.getData(),
                 new OAuthDinerInfo(), false);
-        // 根据业务需求返回视图对象
+        //根据业务需求返回视图对象
         LoginDinerInfo loginDinerInfo = new LoginDinerInfo();
         loginDinerInfo.setToken(dinerInfo.getAccessToken());
         loginDinerInfo.setAvatarUrl(dinerInfo.getAvatarUrl());
