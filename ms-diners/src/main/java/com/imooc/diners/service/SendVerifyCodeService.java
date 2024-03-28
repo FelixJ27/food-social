@@ -25,6 +25,7 @@ public class SendVerifyCodeService {
      * @param phone
      */
     public void send(String phone) {
+
         // 检查非空
         AssertUtil.isNotEmpty(phone, "手机号不能为空");
         // 根据手机号查询是否已生成验证码，已生成直接返回
