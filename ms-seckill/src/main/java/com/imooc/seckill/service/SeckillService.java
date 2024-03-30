@@ -3,6 +3,7 @@ package com.imooc.seckill.service;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
 import com.imooc.commons.constant.ApiConstant;
+import com.imooc.commons.constant.RedisKeyConstant;
 import com.imooc.commons.model.domain.ResultInfo;
 import com.imooc.commons.model.pojo.SeckillVouchers;
 import com.imooc.commons.model.pojo.VoucherOrders;
@@ -12,6 +13,7 @@ import com.imooc.commons.utils.ResultInfoUtil;
 import com.imooc.seckill.mapper.SeckillVouchersMapper;
 import com.imooc.seckill.mapper.VoucherOrdersMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -19,6 +21,8 @@ import org.springframework.web.client.RestTemplate;
 import javax.annotation.Resource;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * 秒杀业务逻辑层
@@ -34,6 +38,8 @@ public class SeckillService {
     private String oauthServerName;
     @Resource
     private RestTemplate restTemplate;
+    @Resource
+    private RedisTemplate redisTemplate;
 
     /**
      * 抢购代金券
@@ -109,10 +115,19 @@ public class SeckillService {
         AssertUtil.isTrue(seckillVouchers.getStartTime().after(seckillVouchers.getEndTime()), "开始时间不能晚于结束时间");
 
         // 验证数据库中是否已经存在该券的秒杀活动
-        SeckillVouchers seckillVouchersFromDb = seckillVouchersMapper.selectVoucher(seckillVouchers.getFkVoucherId());
-        AssertUtil.isTrue(seckillVouchersFromDb != null, "该券已经拥有了抢购活动");
+        //SeckillVouchers seckillVouchersFromDb = seckillVouchersMapper.selectVoucher(seckillVouchers.getFkVoucherId());
+        //AssertUtil.isTrue(seckillVouchersFromDb != null, "该券已经拥有了抢购活动");
         // 插入数据库
-        seckillVouchersMapper.save(seckillVouchers);
+        //seckillVouchersMapper.save(seckillVouchers);
+        //采用redis处理
+        String redisKey = RedisKeyConstant.seckill_vouchers.getKey() + seckillVouchers.getFkVoucherId();
+        Map<String, Object> map = redisTemplate.opsForHash().entries(redisKey);
+        AssertUtil.isTrue(!map.isEmpty() && (int) map.get("amount") > 0,
+                "该券已经拥有了抢购活动");
+        seckillVouchers.setIsValid(1);
+        seckillVouchers.setStartTime(now);
+        seckillVouchers.setCreateDate(now);
+        redisTemplate.opsForHash().putAll(redisKey, BeanUtil.beanToMap(seckillVouchers));
     }
 
 }
