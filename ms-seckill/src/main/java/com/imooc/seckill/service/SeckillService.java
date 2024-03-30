@@ -14,15 +14,13 @@ import com.imooc.seckill.mapper.SeckillVouchersMapper;
 import com.imooc.seckill.mapper.VoucherOrdersMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * 秒杀业务逻辑层
@@ -40,6 +38,8 @@ public class SeckillService {
     private RestTemplate restTemplate;
     @Resource
     private RedisTemplate redisTemplate;
+    @Resource
+    private DefaultRedisScript defaultRedisScript;
 
     /**
      * 抢购代金券
@@ -48,15 +48,22 @@ public class SeckillService {
      * @param accessToken 登录token
      * @Para path 访问路径
      */
+    @Transactional(rollbackFor = Exception.class)
     public ResultInfo doSeckill(Integer voucherId, String accessToken, String path) {
         // 基本参数校验
         AssertUtil.isTrue(voucherId == null || voucherId < 0, "请选择需要抢购的代金券");
         AssertUtil.isNotEmpty(accessToken, "请登录");
         // 判断此代金券是否加入抢购
-        SeckillVouchers seckillVouchers = seckillVouchersMapper.selectVoucher(voucherId);
-        AssertUtil.isTrue(seckillVouchers == null, "该代金券并未有抢购活动");
+        //SeckillVouchers seckillVouchers = seckillVouchersMapper.selectVoucher(voucherId);
+        //AssertUtil.isTrue(seckillVouchers == null, "该代金券并未有抢购活动");
         // 判断是否有效
-        AssertUtil.isTrue(seckillVouchers.getIsValid() == 0, "该活动已结束");
+        //AssertUtil.isTrue(seckillVouchers.getIsValid() == 0, "该活动已结束");
+
+        //redis处理
+        String key = RedisKeyConstant.seckill_vouchers.getKey() + voucherId;
+        Map<String, Object> map = redisTemplate.opsForHash().entries(key);
+        SeckillVouchers seckillVouchers = BeanUtil.mapToBean(map, SeckillVouchers.class, true, null);
+
         // 判断是否开始、结束
         Date now = new Date();
         AssertUtil.isTrue(now.before(seckillVouchers.getStartTime()), "该抢购还未开始");
@@ -78,20 +85,27 @@ public class SeckillService {
                 seckillVouchers.getId());
         AssertUtil.isTrue(order != null, "该用户已抢到该代金券，无需再抢");
         // 扣库存
-        int count = seckillVouchersMapper.stockDecrease(seckillVouchers.getId());
-        AssertUtil.isTrue(count == 0, "该券已经卖完了");
+        //int count = seckillVouchersMapper.stockDecrease(seckillVouchers.getId());
+        //AssertUtil.isTrue(count == 0, "该券已经卖完了");
+        //redis处理
+
         // 下单
         VoucherOrders voucherOrders = new VoucherOrders();
         voucherOrders.setFkDinerId(dinerInfo.getId());
-        voucherOrders.setFkSeckillId(seckillVouchers.getId());
+        //voucherOrders.setFkSeckillId(seckillVouchers.getId());
         voucherOrders.setFkVoucherId(seckillVouchers.getFkVoucherId());
         String orderNo = IdUtil.getSnowflake(1, 1).nextIdStr();
         voucherOrders.setOrderNo(orderNo);
         voucherOrders.setOrderType(1);
         voucherOrders.setStatus(0);
-        count = voucherOrdersMapper.save(voucherOrders);
+        long count = voucherOrdersMapper.save(voucherOrders);
         AssertUtil.isTrue(count == 0, "用户抢购失败");
 
+        List<String> keys = new ArrayList<>();
+        keys.add(key);
+        keys.add("amount");
+        Long amount = (Long) redisTemplate.execute(defaultRedisScript, keys);
+        AssertUtil.isTrue(amount == null || amount < 1, "该券已经卖完了");
         return ResultInfoUtil.buildSuccess(path, "抢购成功");
     }
 
