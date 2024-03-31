@@ -21,7 +21,7 @@ public class OAuthControllerTest extends OAuth2ServerApplicationTests {
     public void writeToken() throws Exception {
         String authorization = Base64Utils.encodeToString("appId:123456".getBytes());
         StringBuffer tokens = new StringBuffer();
-        for (int i = 1900; i < 2000; i++) {
+        for (int i = 1500; i < 2000; i++) {
             MvcResult mvcResult = super.mockMvc.perform(MockMvcRequestBuilders.post("/oauth/token")
                     .header("Authorization", "Basic " + authorization)
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
