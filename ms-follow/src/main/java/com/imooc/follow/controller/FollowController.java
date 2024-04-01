@@ -18,7 +18,7 @@ public class FollowController {
     @Resource
     private HttpServletRequest request;
 
-    @PostMapping
+    @PostMapping("{followDinnerId}")
     public ResultInfo follow(@PathVariable Integer followDinnerId,
                              @RequestParam int isFollowed,
                              String access_token) {
