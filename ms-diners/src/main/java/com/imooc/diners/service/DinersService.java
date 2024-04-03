@@ -6,6 +6,7 @@ import com.imooc.commons.constant.ApiConstant;
 import com.imooc.commons.model.domain.ResultInfo;
 import com.imooc.commons.model.dto.DinersDTO;
 import com.imooc.commons.model.pojo.Diners;
+import com.imooc.commons.model.vo.ShortDinerInfo;
 import com.imooc.commons.utils.AssertUtil;
 import com.imooc.commons.utils.ResultInfoUtil;
 import com.imooc.diners.config.OAuth2ClientConfiguration;
@@ -23,6 +24,7 @@ import org.springframework.web.client.RestTemplate;
 import javax.annotation.Resource;
 import java.time.chrono.IsoChronology;
 import java.util.LinkedHashMap;
+import java.util.List;
 
 /**
  * 食客服务业务逻辑层
@@ -128,5 +130,19 @@ public class DinersService {
         loginDinerInfo.setNickname(dinerInfo.getNickname());
         return ResultInfoUtil.buildSuccess(path, loginDinerInfo);
     }
+
+    /**
+     * 根据 ids 查询食客信息
+     *
+     * @param ids 主键 id，多个以逗号分隔，逗号之间不用空格
+     * @return
+     */
+    public List<ShortDinerInfo> findByIds(String ids) {
+        AssertUtil.isNotEmpty(ids);
+        String[] idArr = ids.split(",");
+        List<ShortDinerInfo> dinerInfos = dinersMapper.findByIds(idArr);
+        return dinerInfos;
+    }
+
 
 }
