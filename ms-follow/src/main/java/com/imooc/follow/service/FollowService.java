@@ -129,7 +129,7 @@ public class FollowService {
      *
      * @param dinerId     要查看的食客ID
      * @param accessToken 登录用户token
-     * @param path 访问地址
+     * @param path        访问地址
      * @return
      */
     public ResultInfo findCommonsFriends(Integer dinerId, String accessToken, String path) {
@@ -144,17 +144,50 @@ public class FollowService {
             return ResultInfoUtil.buildSuccess(path, new ArrayList<ShortDinerInfo>());
         }
         //根据ids查询食客信息
-        ResultInfo resultInfo = restTemplate.getForObject(dinerServerName + "findByIds?access_token={accessToken}&ids={ids}",
+        ResultInfo resultInfo = new ResultInfo();
+        List<ShortDinerInfo> dinerInfos = findDinerInfos(accessToken, followingDinerIds, path, resultInfo);
+        if (CollectionUtil.isEmpty(dinerInfos)) {
+            return resultInfo;
+        }
+        return ResultInfoUtil.buildSuccess(path, dinerInfos);
+    }
+
+    /**
+     * 根据ids查询食客信息
+     * @param accessToken
+     * @param followingDinerIds
+     * @return
+     */
+    private List<ShortDinerInfo> findDinerInfos(String accessToken, Set<Integer> followingDinerIds, String path, ResultInfo resultInfo) {
+        resultInfo = restTemplate.getForObject(dinerServerName + "findByIds?access_token={accessToken}&ids={ids}",
                 ResultInfo.class, accessToken, StrUtil.join(",", followingDinerIds));
         if (resultInfo.getCode() != ApiConstant.SUCCESS_CODE) {
             resultInfo.setPath(path);
-            return resultInfo;
         }
         //处理结果
         List<LinkedHashMap> dinerInfoMaps = (List<LinkedHashMap>) resultInfo.getData();
         List<ShortDinerInfo> dinerInfos = dinerInfoMaps.stream()
                 .map(diner -> BeanUtil.fillBeanWithMap(diner, new ShortDinerInfo(), true))
                 .collect(Collectors.toList());
+        return dinerInfos;
+    }
+
+    /**
+     * 关注列表
+     * @param dinerId
+     * @param accessToken
+     * @param path
+     * @return
+     */
+    public ResultInfo followList(Integer dinerId, String accessToken, String path) {
+        AssertUtil.isTrue(dinerId == null || dinerId < 1, "请选择要查看的人");
+        String followKey = RedisKeyConstant.following.getKey() + dinerId;
+        Set<Integer> followingDinerIds = redisTemplate.opsForSet().members(followKey);
+        ResultInfo resultInfo = new ResultInfo();
+        List<ShortDinerInfo> dinerInfos = findDinerInfos(accessToken, followingDinerIds, path, resultInfo);
+        if (CollectionUtil.isEmpty(dinerInfos)) {
+            return resultInfo;
+        }
         return ResultInfoUtil.buildSuccess(path, dinerInfos);
     }
 }

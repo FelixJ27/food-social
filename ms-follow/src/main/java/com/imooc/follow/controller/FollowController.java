@@ -33,14 +33,28 @@ public class FollowController {
 
     /**
      * 共同好友
-     * @param dinerId       要查看的食客ID
-     * @param access_token  登录用户token
+     *
+     * @param dinerId      要查看的食客ID
+     * @param access_token 登录用户token
      * @return
      */
     @GetMapping("commons/{dinerId}")
     public ResultInfo findCommonsFriends(@PathVariable Integer dinerId,
                                          String access_token) {
         ResultInfo resultInfo = followService.findCommonsFriends(dinerId, access_token, request.getServletPath());
+        return resultInfo;
+    }
+
+    /**
+     * 关注列表
+     *
+     * @param dinerId 要查看的食客id
+     * @return
+     */
+    @GetMapping("followList/{dinerId}")
+    public ResultInfo followList(@PathVariable Integer dinerId,
+                                 String access_token) {
+        ResultInfo resultInfo = followService.followList(dinerId, access_token, request.getServletPath());
         return resultInfo;
     }
 }
