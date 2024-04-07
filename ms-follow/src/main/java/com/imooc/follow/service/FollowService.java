@@ -15,7 +15,12 @@ import com.imooc.commons.utils.ResultInfoUtil;
 import com.imooc.follow.mapper.FollowMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
@@ -32,6 +37,8 @@ public class FollowService {
     private String oauthServerName;
     @Value("${service.name.ms-diners-server}")
     private String dinerServerName;
+    @Value("${service.name.ms-feeds-server}")
+    private String feedsServerName;
     @Resource
     private FollowMapper followMapper;
     @Resource
@@ -40,44 +47,80 @@ public class FollowService {
     private RestTemplate restTemplate;
 
     /**
+     * 发送请求添加或者移除关注人的Feed列表
+     *
+     * @param followDinerId 关注好友的ID
+     * @param accessToken   当前登录用户token
+     * @param type          0=取关 1=关注
+     */
+    private void sendSaveOrRemoveFeed(Integer followDinerId, String accessToken, int type) {
+        String feedsUpdateUrl = feedsServerName + "updateFollowingFeeds/"
+                + followDinerId + "?access_token=" + accessToken;
+        // 构建请求头
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        // 构建请求体（请求参数）
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("type", type);
+        HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
+        restTemplate.postForEntity(feedsUpdateUrl, entity, ResultInfo.class);
+    }
+
+    /**
      * 关注/取关
      *
-     * @param followDinnerId 关注的食客id
+     * @param followDinerId 关注的食客id
      * @param isFollowed     是否关注 1-关注 0-取关
      * @param accessToken    登录用户token
      * @param path           访问地址
      * @return
      */
-    public ResultInfo follow(Integer followDinnerId, int isFollowed, String accessToken, String path) {
-        AssertUtil.isTrue(followDinnerId == null || followDinnerId < 1, "请选择要关注的人");
+    public ResultInfo follow(Integer followDinerId, int isFollowed, String accessToken, String path) {
+        AssertUtil.isTrue(followDinerId == null || followDinerId < 1, "请选择要关注的人");
         //获取登录用户信息
         SignInDinerInfo dinerInfo = loadSignInDinerInfo(accessToken);
         //获取当前用户与需要关注用户的关注信息
-        Follow follow = followMapper.selectFollow(dinerInfo.getId(), followDinnerId);
-        //如果没有关注信息，且要进行关注
+        Follow follow = followMapper.selectFollow(dinerInfo.getId(), followDinerId);
+        // 如果没有关注信息，且要进行关注操作
         if (follow == null && isFollowed == 1) {
-            int count = followMapper.save(dinerInfo.getId(), followDinnerId);
+            // 添加关注信息
+            int count = followMapper.save(dinerInfo.getId(), followDinerId);
+            // 添加关注列表到 Redis
             if (count == 1) {
-                addToRedisSet(dinerInfo.getId(), followDinnerId);
+                addToRedisSet(dinerInfo.getId(), followDinerId);
+                // 保存 Feed
+                sendSaveOrRemoveFeed(followDinerId, accessToken, 1);
             }
             return ResultInfoUtil.build(ApiConstant.SUCCESS_CODE,
                     "关注成功", path, "关注成功");
         }
-        if (follow != null && isFollowed == 1 && follow.getIsValid() == 0) {
+
+// 如果有关注信息，且目前处于取关状态，且要进行关注操作
+        if (follow != null && follow.getIsValid() == 0 && isFollowed == 1) {
+            // 重新关注
             int count = followMapper.update(follow.getId(), isFollowed);
+            // 添加关注列表
             if (count == 1) {
-                addToRedisSet(dinerInfo.getId(), followDinnerId);
+                addToRedisSet(dinerInfo.getId(), followDinerId);
+                // 保存 Feed
+                sendSaveOrRemoveFeed(followDinerId, accessToken, 1);
             }
             return ResultInfoUtil.build(ApiConstant.SUCCESS_CODE,
                     "关注成功", path, "关注成功");
         }
-        if (follow != null && isFollowed == 0 && follow.getIsValid() == 1) {
+
+// 如果有关注信息，且目前处于关注中状态，且要进行取关操作
+        if (follow != null && follow.getIsValid() == 1 && isFollowed == 0) {
+            // 取关
             int count = followMapper.update(follow.getId(), isFollowed);
             if (count == 1) {
-                removeFromRedisSet(dinerInfo.getId(), followDinnerId);
+                // 移除 Redis 关注列表
+                removeFromRedisSet(dinerInfo.getId(), followDinerId);
+                // 移除 Feed
+                sendSaveOrRemoveFeed(followDinerId, accessToken, 0);
             }
             return ResultInfoUtil.build(ApiConstant.SUCCESS_CODE,
-                    "取关成功", path, "取关成功");
+                    "成功取关", path, "成功取关");
         }
         return ResultInfoUtil.buildSuccess(path, "操作成功");
     }
@@ -144,25 +187,22 @@ public class FollowService {
             return ResultInfoUtil.buildSuccess(path, new ArrayList<ShortDinerInfo>());
         }
         //根据ids查询食客信息
-        ResultInfo resultInfo = new ResultInfo();
-        List<ShortDinerInfo> dinerInfos = findDinerInfos(accessToken, followingDinerIds, path, resultInfo);
-        if (CollectionUtil.isEmpty(dinerInfos)) {
-            return resultInfo;
-        }
+        List<ShortDinerInfo> dinerInfos = findDinerInfos(accessToken, followingDinerIds, path);
         return ResultInfoUtil.buildSuccess(path, dinerInfos);
     }
 
     /**
      * 根据ids查询食客信息
+     *
      * @param accessToken
      * @param followingDinerIds
      * @return
      */
-    private List<ShortDinerInfo> findDinerInfos(String accessToken, Set<Integer> followingDinerIds, String path, ResultInfo resultInfo) {
-        resultInfo = restTemplate.getForObject(dinerServerName + "findByIds?access_token={accessToken}&ids={ids}",
+    private List<ShortDinerInfo> findDinerInfos(String accessToken, Set<Integer> followingDinerIds, String path) {
+        ResultInfo resultInfo = restTemplate.getForObject(dinerServerName + "findByIds?access_token={accessToken}&ids={ids}",
                 ResultInfo.class, accessToken, StrUtil.join(",", followingDinerIds));
         if (resultInfo.getCode() != ApiConstant.SUCCESS_CODE) {
-            resultInfo.setPath(path);
+            throw new ParameterException(resultInfo.getCode(), resultInfo.getMessage());
         }
         //处理结果
         List<LinkedHashMap> dinerInfoMaps = (List<LinkedHashMap>) resultInfo.getData();
@@ -174,6 +214,7 @@ public class FollowService {
 
     /**
      * 关注列表
+     *
      * @param dinerId
      * @param accessToken
      * @param path
@@ -183,11 +224,21 @@ public class FollowService {
         AssertUtil.isTrue(dinerId == null || dinerId < 1, "请选择要查看的人");
         String followKey = RedisKeyConstant.following.getKey() + dinerId;
         Set<Integer> followingDinerIds = redisTemplate.opsForSet().members(followKey);
-        ResultInfo resultInfo = new ResultInfo();
-        List<ShortDinerInfo> dinerInfos = findDinerInfos(accessToken, followingDinerIds, path, resultInfo);
-        if (CollectionUtil.isEmpty(dinerInfos)) {
-            return resultInfo;
-        }
+        List<ShortDinerInfo> dinerInfos = findDinerInfos(accessToken, followingDinerIds, path);
         return ResultInfoUtil.buildSuccess(path, dinerInfos);
     }
+
+    /**
+     * 获取粉丝列表
+     *
+     * @param dinerId
+     * @return
+     */
+    public Set<Integer> findFollowers(Integer dinerId) {
+        AssertUtil.isNotNull(dinerId, "请选择查看的用户");
+        Set<Integer> followers = redisTemplate.opsForSet()
+                .members(RedisKeyConstant.followers.getKey() + dinerId);
+        return followers;
+    }
+
 }

@@ -1,10 +1,13 @@
 package com.imooc.follow.mapper;
 
+import com.imooc.commons.model.pojo.Feeds;
 import com.imooc.commons.model.pojo.Follow;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+
+import java.util.List;
 
 /**
  * 关注/取关 Mapper
@@ -24,5 +27,4 @@ public interface FollowMapper {
     // 修改关注信息
     @Update("update t_follow set is_valid = #{isFollowed}, update_date = now() where id = #{id}")
     int update(@Param("id") Integer id, @Param("isFollowed") int isFollowed);
-
 }
