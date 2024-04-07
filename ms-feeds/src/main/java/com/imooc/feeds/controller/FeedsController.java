@@ -2,12 +2,14 @@ package com.imooc.feeds.controller;
 
 import com.imooc.commons.model.domain.ResultInfo;
 import com.imooc.commons.model.pojo.Feeds;
+import com.imooc.commons.model.vo.FeedsVO;
 import com.imooc.commons.utils.ResultInfoUtil;
 import com.imooc.feeds.service.FeedsService;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 @RestController
 public class FeedsController {
@@ -43,6 +45,18 @@ public class FeedsController {
                                                 String access_token, @RequestParam int type) {
         feedsService.addFollowingFeeds(followingDinerId, access_token, type);
         return ResultInfoUtil.buildSuccess(request.getServletPath(), "操作成功");
+    }
+
+    /**
+     * 分页获取关注的 Feed 数据
+     *
+     * @param page
+     * @return
+     */
+    @GetMapping("{page}")
+    public ResultInfo selectForPage(@PathVariable Integer page, String access_token) {
+        List<FeedsVO> feedsVOS = feedsService.selectForPage(page, access_token);
+        return ResultInfoUtil.buildSuccess(request.getServletPath(), feedsVOS);
     }
 
 

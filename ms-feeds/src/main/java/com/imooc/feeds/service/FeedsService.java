@@ -1,11 +1,15 @@
 package com.imooc.feeds.service;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.util.StrUtil;
 import com.imooc.commons.constant.ApiConstant;
 import com.imooc.commons.constant.RedisKeyConstant;
 import com.imooc.commons.exception.ParameterException;
 import com.imooc.commons.model.domain.ResultInfo;
 import com.imooc.commons.model.pojo.Feeds;
+import com.imooc.commons.model.vo.FeedsVO;
+import com.imooc.commons.model.vo.ShortDinerInfo;
 import com.imooc.commons.model.vo.SignInDinerInfo;
 import com.imooc.commons.utils.AssertUtil;
 import com.imooc.feeds.mapper.FeedsMapper;
@@ -18,9 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -140,5 +142,45 @@ public class FeedsService {
                     .collect(Collectors.toSet());
             redisTemplate.opsForZSet().add(key, typedTuples);
         }
+    }
+
+    public List<FeedsVO> selectForPage(Integer page, String accessToken) {
+        if (page == null) {
+            page = 1;
+        }
+        SignInDinerInfo dinerInfo = loadSignInDinerInfo(accessToken);
+        String key = RedisKeyConstant.following_feeds.getKey() + dinerInfo.getId();
+        long pageStart = (page - 1) * ApiConstant.PAGE_SIZE;
+        long pageEnd = page * ApiConstant.PAGE_SIZE - 1;
+        Set<Integer> feedIds = redisTemplate.opsForZSet().reverseRange(key, pageStart, pageEnd);
+        if (CollectionUtil.isEmpty(feedIds)) {
+            return new ArrayList<>();
+        }
+
+        List<Integer> feedsDinerIds = new ArrayList<>();
+        List<Feeds> feeds = feedsMapper.findFeedsByIds(feedIds);
+        List<FeedsVO> feedsVOS = feeds.stream().map(feed -> {
+            FeedsVO feedsVO = new FeedsVO();
+            BeanUtil.copyProperties(feed, feedsVO, true);
+            feedsDinerIds.add(feed.getFkDinerId());
+            return feedsVO;
+        }).collect(Collectors.toList());
+
+        String url = dinersServerName + "findByIds?access_token=${accessToken}&ids={ids}";
+        ResultInfo resultInfo = restTemplate.getForObject(url, ResultInfo.class, accessToken, StrUtil.join(",", feedsDinerIds));
+        if (resultInfo.getCode() != ApiConstant.SUCCESS_CODE) {
+            throw new ParameterException(resultInfo.getCode(), resultInfo.getMessage());
+        }
+
+        List<LinkedHashMap> dinerInfoMap = (List<LinkedHashMap>) resultInfo.getData();
+        Map<Integer, ShortDinerInfo> dinerInfos = dinerInfoMap.stream()
+                .collect(Collectors.toMap(
+                        diner -> (Integer) diner.get("id"),
+                        diner -> BeanUtil.fillBeanWithMap(diner, new ShortDinerInfo(), true)
+                ));
+        feedsVOS.forEach(feedsVO -> {
+            feedsVO.setDinerInfo(dinerInfos.get(feedsVO.getFkDinerId()));
+        });
+        return feedsVOS;
     }
 }

@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
+import java.util.Set;
 
 public interface FeedsMapper {
 
@@ -22,5 +23,16 @@ public interface FeedsMapper {
     @Select("select id, content, update_date from t_feeds " +
             " where fk_diner_id = #{dinerId} and is_valid = 1")
     List<Feeds> findByDinerId(@Param("dinerId") Integer dinerId);
+
+    // 根据多主键查询 Feed
+    @Select("<script> " +
+            " select id, content, fk_diner_id, praise_amount, " +
+            " comment_amount, fk_restaurant_id, create_date, update_date, is_valid " +
+            " from t_feeds where is_valid = 1 and id in " +
+            " <foreach item=\"id\" collection=\"feedIds\" open=\"(\" separator=\",\" close=\")\">" +
+            "   #{id}" +
+            " </foreach> order by id desc" +
+            " </script>")
+    List<Feeds> findFeedsByIds(@Param("feedIds") Set<Integer> feedIds);
 
 }
