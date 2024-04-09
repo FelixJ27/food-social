@@ -1,6 +1,7 @@
 package com.imooc.diners.service;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.imooc.commons.constant.ApiConstant;
 import com.imooc.commons.model.domain.ResultInfo;
@@ -14,6 +15,7 @@ import com.imooc.diners.domain.OAuthDinerInfo;
 import com.imooc.diners.mapper.DinersMapper;
 import com.imooc.diners.vo.LoginDinerInfo;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
 import org.springframework.http.client.support.BasicAuthenticationInterceptor;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
 import java.time.chrono.IsoChronology;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 
@@ -42,6 +45,8 @@ public class DinersService {
     private DinersMapper dinersMapper;
     @Resource
     private SendVerifyCodeService sendVerifyCodeService;
+    @Resource
+    private RedisTemplate redisTemplate;
 
     /**
      * 用户注册
@@ -114,21 +119,31 @@ public class DinersService {
         //发送请求
         ResponseEntity<ResultInfo> result = restTemplate.postForEntity(oauthServerName + "oauth/token", entity, ResultInfo.class);
         //处理返回结果
-        AssertUtil.isTrue(result.getStatusCode() != HttpStatus.OK,"登录失败");
+        AssertUtil.isTrue(result.getStatusCode() != HttpStatus.OK, "登录失败");
         ResultInfo resultInfo = result.getBody();
         if (resultInfo.getCode() != ApiConstant.SUCCESS_CODE) {
             resultInfo.setData(resultInfo.getMessage());
             return resultInfo;
         }
         //这里的data是一个LinkedHashMap转成了域对象OAuthDinerInfo
-        OAuthDinerInfo dinerInfo = BeanUtil.fillBeanWithMap((LinkedHashMap)resultInfo.getData(),
+        OAuthDinerInfo dinerInfo = BeanUtil.fillBeanWithMap((LinkedHashMap) resultInfo.getData(),
                 new OAuthDinerInfo(), false);
         //根据业务需求返回视图对象
         LoginDinerInfo loginDinerInfo = new LoginDinerInfo();
         loginDinerInfo.setToken(dinerInfo.getAccessToken());
         loginDinerInfo.setAvatarUrl(dinerInfo.getAvatarUrl());
         loginDinerInfo.setNickname(dinerInfo.getNickname());
+        Date date = new Date();
+        Diners diner = dinersMapper.selectByUsername(account);
+        long offset = DateUtil.dayOfMonth(date) - 1;
+        String key = buildLoginKey(diner.getId(), date);
+        redisTemplate.opsForValue().setBit(key, offset, true);
         return ResultInfoUtil.buildSuccess(path, loginDinerInfo);
+    }
+
+    private String buildLoginKey(Integer dinerId, Date date) {
+        return String.format("user:login:%d:%s",
+                dinerId, DateUtil.format(date, "yyyyMM"));
     }
 
     /**
