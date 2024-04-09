@@ -10,6 +10,7 @@ import com.imooc.commons.exception.ParameterException;
 import com.imooc.commons.model.domain.ResultInfo;
 import com.imooc.commons.model.vo.SignInDinerInfo;
 import com.imooc.commons.utils.AssertUtil;
+import com.imooc.commons.utils.CommonUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.RedisCallback;
@@ -43,7 +44,7 @@ public class SignService {
         // 获取登录用户信息
         SignInDinerInfo signInDinerInfo = loadSignInDinerInfo(accessToken);
         // 获取日期
-        Date date = getDate(dateStr);
+        Date date = CommonUtil.getDate(dateStr);
         // 获取日期对应的天数，多少号
         int offset = DateUtil.dayOfMonth(date) - 1; // 从 0 开始
         // 构建 Key
@@ -110,24 +111,6 @@ public class SignService {
     }
 
     /**
-     * 获取日期
-     *
-     * @param dateStr yyyy-MM-dd 默认当天
-     * @return
-     */
-    private static Date getDate(String dateStr) {
-        if (StrUtil.isBlank(dateStr)) {
-            return new Date();
-        }
-        try {
-            return DateUtil.parseDate(dateStr);
-        } catch (Exception e) {
-            throw new ParameterException("请传入yyyy-MM-dd的日期格式");
-        }
-    }
-
-
-    /**
      * 获取登录用户信息
      *
      * @param accessToken
@@ -156,7 +139,7 @@ public class SignService {
      */
     public Long getSignCount(String accessToken, String dateSer) {
         SignInDinerInfo dinerInfo = loadSignInDinerInfo(accessToken);
-        Date date = getDate(dateSer);
+        Date date = CommonUtil.getDate(dateSer);
         String key = buildSignKey(dinerInfo.getId(), date);
         return (Long) redisTemplate.execute((RedisCallback<Long>) con -> con.bitCount(key.getBytes()));
     }
@@ -170,12 +153,13 @@ public class SignService {
      */
     public Map<String, Boolean> getSignInfo(String accessToken, String dateStr) {
         SignInDinerInfo dinerInfo = loadSignInDinerInfo(accessToken);
-        Date date = getDate(dateStr);
+        Date date = CommonUtil.getDate(dateStr);
         String key = buildSignKey(dinerInfo.getId(), date);
         Map<String, Boolean> signInfo = new HashMap<>();
         int dayOfMonth = DateUtil.lengthOfMonth(DateUtil.month(date) + 1,
                 DateUtil.isLeapYear(DateUtil.year(date)));
-        BitFieldSubCommands bitFieldSubCommands = BitFieldSubCommands.create().get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth)).valueAt(0);
+        BitFieldSubCommands bitFieldSubCommands = BitFieldSubCommands.create()
+                .get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth)).valueAt(0);
         List<Long> list = redisTemplate.opsForValue().bitField(key, bitFieldSubCommands);
         if (CollectionUtil.isEmpty(list)) {
             return signInfo;
@@ -192,7 +176,7 @@ public class SignService {
 
     public String getFirstDaySignIn(String accessToken, String dateStr) {
         SignInDinerInfo dinerInfo = loadSignInDinerInfo(accessToken);
-        Date date = getDate(dateStr);
+        Date date = CommonUtil.getDate(dateStr);
         String key = buildSignKey(dinerInfo.getId(), date);
         Long l = (Long) redisTemplate.execute((RedisCallback<Long>) com -> com.bitPos(key.getBytes(), true));
         if (l == -1) {

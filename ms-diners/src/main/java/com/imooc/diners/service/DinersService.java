@@ -1,20 +1,27 @@
 package com.imooc.diners.service;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.imooc.commons.constant.ApiConstant;
+import com.imooc.commons.exception.ParameterException;
 import com.imooc.commons.model.domain.ResultInfo;
 import com.imooc.commons.model.dto.DinersDTO;
 import com.imooc.commons.model.pojo.Diners;
 import com.imooc.commons.model.vo.ShortDinerInfo;
+import com.imooc.commons.model.vo.SignInDinerInfo;
 import com.imooc.commons.utils.AssertUtil;
+import com.imooc.commons.utils.CommonUtil;
 import com.imooc.commons.utils.ResultInfoUtil;
 import com.imooc.diners.config.OAuth2ClientConfiguration;
 import com.imooc.diners.domain.OAuthDinerInfo;
 import com.imooc.diners.mapper.DinersMapper;
 import com.imooc.diners.vo.LoginDinerInfo;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
 import org.springframework.http.client.support.BasicAuthenticationInterceptor;
@@ -24,10 +31,9 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
 import java.time.chrono.IsoChronology;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.*;
 
 /**
  * 食客服务业务逻辑层
@@ -160,4 +166,54 @@ public class DinersService {
     }
 
 
+    /**
+     * 获取用户登录情况
+     *
+     * @param accessToken
+     * @param dateStr
+     * @return
+     */
+    public Map<String, Boolean> getLoginInfo(String accessToken, String dateStr) {
+        SignInDinerInfo dinerInfo = loadSignInDinerInfo(accessToken);
+        Date date = CommonUtil.getDate(dateStr);
+        String loginKey = buildLoginKey(dinerInfo.getId(), date);
+        int dayOfMonth = DateUtil.lengthOfMonth(DateUtil.month(date) + 1,
+                DateUtil.isLeapYear(DateUtil.year(date)));
+        BitFieldSubCommands bitFieldSubCommands = BitFieldSubCommands.create()
+                .get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth)).valueAt(0);
+        List<Long> list = redisTemplate.opsForValue().bitField(loginKey, bitFieldSubCommands);
+        Map<String, Boolean> loginInfo = new HashMap<>();
+        if (CollectionUtil.isEmpty(list)) {
+            return loginInfo;
+        }
+        Long v = list.get(0) == null ? 0 : list.get(0);
+        for (int i = dayOfMonth; i > 0; i--) {
+            boolean flag = v >> 1 << 1 != v;
+            LocalDateTime dateTime = LocalDateTimeUtil.of(date).withDayOfMonth(i);
+            loginInfo.put(DateUtil.format(dateTime, "yyyy-MM-dd"), flag);
+            v >>= 1;
+        }
+        return loginInfo;
+    }
+
+
+    /**
+     * 获取登录用户信息
+     *
+     * @param accessToken
+     * @return
+     */
+    private SignInDinerInfo loadSignInDinerInfo(String accessToken) {
+        // 是否有 accessToken
+        AssertUtil.mustLogin(accessToken);
+        String url = oauthServerName + "user/me?access_token={accessToken}";
+        ResultInfo resultInfo = restTemplate.getForObject(url, ResultInfo.class, accessToken);
+        if (resultInfo.getCode() != ApiConstant.SUCCESS_CODE) {
+            throw new ParameterException(resultInfo.getCode(), resultInfo.getMessage());
+        }
+        // 这里的data是一个LinkedHashMap，SignInDinerInfo
+        SignInDinerInfo dinerInfo = BeanUtil.fillBeanWithMap((LinkedHashMap) resultInfo.getData(),
+                new SignInDinerInfo(), false);
+        return dinerInfo;
+    }
 }

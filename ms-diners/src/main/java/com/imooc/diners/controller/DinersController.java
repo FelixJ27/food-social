@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 食客服务控制层
@@ -70,6 +71,12 @@ public class DinersController {
     public ResultInfo<List<ShortDinerInfo>> findByIds(String ids) {
         List<ShortDinerInfo> dinerInfos = dinersService.findByIds(ids);
         return ResultInfoUtil.buildSuccess(request.getServletPath(), dinerInfos);
+    }
+
+    @GetMapping("getLoginInfo")
+    public ResultInfo<Map<String, Boolean>> getLoginInfo(String access_token, String dateStr) {
+        Map<String, Boolean> loginInfo = dinersService.getLoginInfo(access_token, dateStr);
+        return ResultInfoUtil.buildSuccess(request.getServletPath(), loginInfo);
     }
 
 }
