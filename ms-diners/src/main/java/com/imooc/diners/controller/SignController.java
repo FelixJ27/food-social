@@ -55,4 +55,9 @@ public class SignController {
         return ResultInfoUtil.buildSuccess(request.getServletPath(), signInfo);
     }
 
+    @GetMapping("firstDay")
+    public ResultInfo<String> getFirstDaySignIn(String access_token, String dateStr) {
+        String fistDay = signService.getFirstDaySignIn(access_token, dateStr);
+        return ResultInfoUtil.buildSuccess(request.getServletPath(), fistDay);
+    }
 }

@@ -20,6 +20,7 @@ import org.springframework.web.client.RestTemplate;
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.logging.Logger;
 
 @Service
 public class SignService {
@@ -187,5 +188,17 @@ public class SignService {
             v >>= 1;
         }
         return signInfo;
+    }
+
+    public String getFirstDaySignIn(String accessToken, String dateStr) {
+        SignInDinerInfo dinerInfo = loadSignInDinerInfo(accessToken);
+        Date date = getDate(dateStr);
+        String key = buildSignKey(dinerInfo.getId(), date);
+        Long l = (Long) redisTemplate.execute((RedisCallback<Long>) com -> com.bitPos(key.getBytes(), true));
+        if (l == -1) {
+            return "";
+        }
+        LocalDateTime localDateTime = LocalDateTimeUtil.of(date).withDayOfMonth(Math.toIntExact(l + 1));
+        return DateUtil.format(localDateTime, "yyyy-MM-dd");
     }
 }
