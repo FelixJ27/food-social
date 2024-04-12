@@ -6,6 +6,7 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.core.util.StrUtil;
 import com.imooc.commons.constant.ApiConstant;
+import com.imooc.commons.constant.PointTypesConstant;
 import com.imooc.commons.exception.ParameterException;
 import com.imooc.commons.model.domain.ResultInfo;
 import com.imooc.commons.model.vo.SignInDinerInfo;
@@ -15,7 +16,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
@@ -28,6 +32,8 @@ public class SignService {
 
     @Value("${service.name.ms-oauth-server}")
     private String oauthServerName;
+    @Value("${service.name.ms-points-server}")
+    private String pointsServerName;
     @Resource
     private RestTemplate restTemplate;
     @Resource
@@ -56,7 +62,7 @@ public class SignService {
         redisTemplate.opsForValue().setBit(signKey, offset, true);
         // 统计连续签到次数
         int count = getContinuousSignCount(signInDinerInfo.getId(), date);
-        return count;
+        return addPoints(count, signInDinerInfo.getId());
     }
 
     /**
@@ -185,4 +191,44 @@ public class SignService {
         LocalDateTime localDateTime = LocalDateTimeUtil.of(date).withDayOfMonth(Math.toIntExact(l + 1));
         return DateUtil.format(localDateTime, "yyyy-MM-dd");
     }
+
+    /**
+     * 添加用户积分
+     *
+     * @param count         连续签到次数
+     * @param signInDinerId 登录用户id
+     * @return 获取的积分
+     */
+    private int addPoints(int count, Integer signInDinerId) {
+        // 签到1天送10积分，连续签到2天送20积分，3天送30积分，4天以上均送50积分
+        int points = 10;
+        if (count == 2) {
+            points = 20;
+        } else if (count == 3) {
+            points = 30;
+        } else if (count >= 4) {
+            points = 50;
+        }
+        // 调用积分接口添加积分
+        // 构建请求头
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        // 构建请求体（请求参数）
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("dinerId", signInDinerId);
+        body.add("points", points);
+        body.add("types", PointTypesConstant.sign.getType());
+        HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
+        // 发送请求
+        ResponseEntity<ResultInfo> result = restTemplate.postForEntity(pointsServerName,
+                entity, ResultInfo.class);
+        AssertUtil.isTrue(result.getStatusCode() != HttpStatus.OK, "登录失败！");
+        ResultInfo resultInfo = result.getBody();
+        if (resultInfo.getCode() != ApiConstant.SUCCESS_CODE) {
+            // 失败了, 事物要进行回滚
+            throw new ParameterException(resultInfo.getCode(), resultInfo.getMessage());
+        }
+        return points;
+    }
+
 }
