@@ -53,6 +53,12 @@ spring:
           filters:
             - StripPrefix=1
 
+        - id: ms-restaurants
+          uri: lb://ms-restaurants
+          predicates:
+            - Path=/restaurants/**
+          filters:
+              - StripPrefix=1
 
 secure:
   ignore:
@@ -64,7 +70,8 @@ secure:
       - /diners/checkPhone
       - /diners/register
       - /seckill/add
-
+      - /restaurants/**
+      -
 # 配置 Eureka Server 注册中心
 eureka:
   instance:

@@ -1,9 +1,9 @@
 server:
-  port: 8085 # 端口
+  port: 8087 # 端口
 
 spring:
   application:
-    name: ms-feeds # 应用名
+    name: ms-restaurants # 应用名
   # 数据库
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -16,22 +16,10 @@ spring:
     host: 154.8.177.34
     timeout: 3000
     password: 123456
-    # lettuce 连接池
-    lettuce:
-      pool:
-        max-active: 8 # 最大连接数，默认 8
-        max-idle: 8 # 最大空闲连接，默认 8
-        min-idle: 0 # 最小空闲连接，默认 0
-        max-wait: 1000 # 最大连接阻塞等待时间，单位毫秒，默认 -1
-    # 哨兵
-    sentinel:
-      # 主节点名称
-      master: mymaster
-      # 主从服务器地址
-      nodes: 192.168.10.101:26379,192.168.10.102:26379,192.168.10.103:26379
+    database: 5
   # Swagger
   swagger:
-    base-package: com.imooc.feeds
+    base-package: com.imooc.points
     title: 慕课美食社交食客API接口文档
 
 # 配置 Eureka Server 注册中心
@@ -47,7 +35,6 @@ service:
   name:
     ms-oauth-server: http://ms-oauth2-server/
     ms-diners-server: http://ms-diners/
-    ms-follow-server: http://ms-follow/
 
 mybatis:
   configuration:
@@ -55,4 +42,4 @@ mybatis:
 
 logging:
   pattern:
-    console: '%d{HH:mm:ss} [%thread] %-5level %logger{50} - %msg%n'
+    console: '%d{2100-01-01 13:14:00.666} [%thread] %-5level %logger{50} - %msg%n'
