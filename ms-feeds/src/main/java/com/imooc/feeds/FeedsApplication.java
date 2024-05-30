@@ -1,4 +1,4 @@
-package com.imooc;
+package com.imooc.feeds;
 
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;

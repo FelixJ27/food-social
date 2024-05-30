@@ -17,18 +17,23 @@ spring:
     timeout: 3000
     password: 123456
     # lettuce 连接池
-    lettuce:
-      pool:
-        max-active: 8 # 最大连接数，默认 8
-        max-idle: 8 # 最大空闲连接，默认 8
-        min-idle: 0 # 最小空闲连接，默认 0
-        max-wait: 1000 # 最大连接阻塞等待时间，单位毫秒，默认 -1
+    #lettuce:
+     # pool:
+      #  max-active: 8 # 最大连接数，默认 8
+       # max-idle: 8 # 最大空闲连接，默认 8
+        #min-idle: 0 # 最小空闲连接，默认 0
+        #max-wait: 1000 # 最大连接阻塞等待时间，单位毫秒，默认 -1
     # 哨兵
-    sentinel:
+    #sentinel:
       # 主节点名称
-      master: mymaster
+      #master: mymaster
       # 主从服务器地址
-      nodes: 192.168.10.101:26379,192.168.10.102:26379,192.168.10.103:26379
+      #nodes: 192.168.10.101:26379,192.168.10.102:26379,192.168.10.103:26379
+  rabbitmq:
+    host: 154.8.177.34
+    port: 5672
+    username: guest
+    password: guest
   # Swagger
   swagger:
     base-package: com.imooc.feeds
