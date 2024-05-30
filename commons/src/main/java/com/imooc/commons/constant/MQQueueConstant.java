@@ -5,7 +5,7 @@ import lombok.Getter;
 @Getter
 public enum MQQueueConstant {
 
-    FEEDS_FOLLOW("queue.feeds.follow", "feeds流粉丝列表"),
+    FEEDS_FOLLOW("feeds.follow", "feeds流粉丝列表"),
     ;
 
     private String queue;
