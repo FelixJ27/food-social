@@ -29,6 +29,12 @@ spring:
       master: mymaster
       # 主从服务器地址
       nodes: 192.168.10.101:26379,192.168.10.102:26379,192.168.10.103:26379
+  #RabbitMQ
+  rabbitmq:
+    host: 192.168.10.101
+    port: 5672
+    username: guest
+    password: guest
   # Swagger
   swagger:
     base-package: com.imooc.feeds
