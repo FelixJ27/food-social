@@ -3,7 +3,11 @@ package com.imooc.feeds.service;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.StrUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.imooc.commons.constant.ApiConstant;
+import com.imooc.commons.constant.MQExchangeConstant;
+import com.imooc.commons.constant.MQRoutingKeyConstant;
 import com.imooc.commons.constant.RedisKeyConstant;
 import com.imooc.commons.exception.ParameterException;
 import com.imooc.commons.model.domain.ResultInfo;
@@ -16,6 +20,12 @@ import com.imooc.feeds.mapper.FeedsMapper;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.DefaultTypedTuple;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -28,6 +38,7 @@ import javax.annotation.Resource;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class FeedsService {
 
@@ -43,6 +54,10 @@ public class FeedsService {
     private RedisTemplate redisTemplate;
     @Resource
     private FeedsMapper feedsMapper;
+    @Resource
+    private RabbitTemplate rabbitTemplate;
+
+    ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * 添加 Feed
@@ -51,7 +66,7 @@ public class FeedsService {
      * @param accessToken 登录token
      */
     @Transactional(rollbackFor = Exception.class)
-    public void create(Feeds feeds, String accessToken) {
+    public void create(Feeds feeds, String accessToken) throws JsonProcessingException {
         // 非空校验
         AssertUtil.isNotEmpty(feeds.getContent(), "请输入内容");
         AssertUtil.isTrue(feeds.getContent().length() > 255, "输入内容太多，请重新输入");
@@ -64,16 +79,12 @@ public class FeedsService {
         AssertUtil.isTrue(count == 0, "添加失败");
 
         // 推送到粉丝的列表中 -- 后续这里应该采用异步消息队列解决性能问题
-
-        // 先获取我的粉丝
-        List<Integer> followers = findFollowers(dinerInfo.getId());
-
-        // 推送 Feeds，以时间作为分数存储至 ZSet
-        long now = System.currentTimeMillis();
-        followers.forEach(follower -> {
-            String key = RedisKeyConstant.following_feeds.getKey() + follower;
-            redisTemplate.opsForZSet().add(key, feeds.getId(), now);
-        });
+        MessageProperties messageProperties = new MessageProperties();
+        String feedsStr = objectMapper.writeValueAsString(feeds);
+        Message message = new Message(feedsStr.getBytes(), messageProperties);
+        CorrelationData correlationData  = new CorrelationData();
+        rabbitTemplate.send(MQExchangeConstant.FEEDS_FOLLOW.getExchange(),
+                MQRoutingKeyConstant.FEEDS_KEY.getKey(), message, correlationData);
     }
 
     /**

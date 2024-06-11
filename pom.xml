@@ -18,7 +18,8 @@
         <module>ms-follow</module>
         <module>ms-feeds</module>
         <module>ms-points</module>
-        <module>me-restaurants</module>
+        <module>ms-restaurants</module>
+        <module>ms-order</module>
     </modules>
 
     <!-- 可以集中定义依赖资源的版本信息 -->

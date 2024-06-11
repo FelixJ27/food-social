@@ -114,7 +114,6 @@ public class SeckillService {
 
         // Redisson 分布式锁
         RLock lock = redissonClient.getLock(lockName);
-
         try {
             // 不为空意味着拿到锁了，执行下单
             // 自定义 Redis 分布式锁处理

@@ -53,6 +53,13 @@ spring:
           filters:
             - StripPrefix=1
 
+        - id: ms-order
+          uri: lb://ms-order
+          predicates:
+            - Path=/order/**
+          filters:
+            - StripPrefix=1
+
         - id: ms-restaurants
           uri: lb://ms-restaurants
           predicates:
@@ -71,7 +78,7 @@ secure:
       - /diners/register
       - /seckill/add
       - /restaurants/**
-      -
+      - /order/**
 # 配置 Eureka Server 注册中心
 eureka:
   instance:

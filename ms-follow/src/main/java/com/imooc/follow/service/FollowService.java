@@ -95,7 +95,7 @@ public class FollowService {
                     "关注成功", path, "关注成功");
         }
 
-// 如果有关注信息，且目前处于取关状态，且要进行关注操作
+        // 如果有关注信息，且目前处于取关状态，且要进行关注操作
         if (follow != null && follow.getIsValid() == 0 && isFollowed == 1) {
             // 重新关注
             int count = followMapper.update(follow.getId(), isFollowed);
@@ -109,7 +109,7 @@ public class FollowService {
                     "关注成功", path, "关注成功");
         }
 
-// 如果有关注信息，且目前处于关注中状态，且要进行取关操作
+        // 如果有关注信息，且目前处于关注中状态，且要进行取关操作
         if (follow != null && follow.getIsValid() == 1 && isFollowed == 0) {
             // 取关
             int count = followMapper.update(follow.getId(), isFollowed);
