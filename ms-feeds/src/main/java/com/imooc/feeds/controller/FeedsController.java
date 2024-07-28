@@ -1,5 +1,6 @@
 package com.imooc.feeds.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.imooc.commons.model.domain.ResultInfo;
 import com.imooc.commons.model.pojo.Feeds;
 import com.imooc.commons.model.vo.FeedsVO;
@@ -27,7 +28,7 @@ public class FeedsController {
      * @return
      */
     @PostMapping
-    public ResultInfo<String> create(@RequestBody Feeds feeds, String access_token) {
+    public ResultInfo<String> create(@RequestBody Feeds feeds, String access_token) throws JsonProcessingException {
         feedsService.create(feeds, access_token);
         return ResultInfoUtil.buildSuccess(request.getServletPath(), "添加成功");
     }

@@ -85,6 +85,7 @@ public class FeedsService {
         CorrelationData correlationData  = new CorrelationData();
         rabbitTemplate.send(MQExchangeConstant.FEEDS_FOLLOW.getExchange(),
                 MQRoutingKeyConstant.FEEDS_KEY.getKey(), message, correlationData);
+        Map<String, String> map = new HashMap<>();
     }
 
     /**
